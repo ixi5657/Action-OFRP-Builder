@@ -95,8 +95,11 @@ jobs:
         cd workspace
         source build/envsetup.sh
         export ALLOW_MISSING_DEPENDENCIES=true
+        export FOX_DEVICE="${{ github.event.inputs.DEVICE_NAME }}"
+        
+        # Пробуем omni_ префикс
+        lunch omni_${{ github.event.inputs.DEVICE_NAME }}-eng || \
         lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng
-        mka ${{ github.event.inputs.BUILD_TARGET }} -j$(nproc --all)
 
     - name: Upload
       uses: softprops/action-gh-release@v2
