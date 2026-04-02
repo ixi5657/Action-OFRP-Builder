@@ -95,9 +95,18 @@ jobs:
 
     - name: Sync OrangeFox sources
       run: |
-        git clone ${{ github.event.inputs.SYNC_URL }} sync
-        cd sync
-        ./orangefox_sync.sh --branch ${{ github.event.inputs.MANIFEST_BRANCH }} --path ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
+        mkdir -p ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
+        cd ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
+        
+        if ! command -v repo &> /dev/null; then
+          curl https://storage.googleapis.com/git-repo-downloads/repo > /tmp/repo
+          chmod a+x /tmp/repo
+          sudo mv /tmp/repo /usr/local/bin/repo
+        fi
+        
+        repo init --depth=1 -u https://gitlab.com/OrangeFox/misc/manifests.git -b fox_${{ github.event.inputs.MANIFEST_BRANCH }}
+        
+        repo sync -c --force-sync --no-clone-bundle --no-tags -j$(nproc --all)
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
 
     - name: Clone device tree
