@@ -6,7 +6,7 @@ on:
       MANIFEST_BRANCH:
         description: 'Android Version (7.1, 12.1, 14.1)'
         required: true
-        default: '7.1'
+        default: '9.0'
       DEVICE_TREE_URL:
         description: 'Device Tree URL'
         required: true
@@ -18,7 +18,7 @@ on:
       DEVICE_PATH:
         description: 'Device Path'
         required: true
-        default: 'device/tcl/U5A_PLUS_3G'
+        default: 'tcl/U5A_PLUS_3G'
       DEVICE_NAME:
         description: 'Device Name'
         required: true
@@ -26,7 +26,7 @@ on:
       MAKEFILE_NAME:
         description: 'Makefile Name'
         required: true
-        default: 'twrp_U5A_PLUS_3G'
+        default: 'omni_U5A_PLUS_3G'
       BUILD_TARGET:
         description: 'Build Target'
         required: true
@@ -78,12 +78,12 @@ jobs:
         repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b twrp-7.1
         repo sync -c --force-sync --no-clone-bundle --no-tags -j$(nproc --all)
 
-    - name: Setup OrangeFox 7.1
+    - name: Setup OrangeFox 9.0
       run: |
         cd workspace
         rm -rf build/make bootable/recovery
-        git clone https://gitlab.com/OrangeFox/build/make.git -b fox_7.1 build/make
-        git clone https://gitlab.com/OrangeFox/bootable/recovery.git -b fox_7.1 bootable/recovery
+        git clone https://gitlab.com/OrangeFox/build/make.git -b fox_9.0 build/make
+        git clone https://gitlab.com/OrangeFox/bootable/recovery.git -b fox_9.0 bootable/recovery
 
     - name: Clone Device Tree
       run: |
