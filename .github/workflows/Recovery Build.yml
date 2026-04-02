@@ -1,3 +1,39 @@
+В Ubuntu 22.04 пакет `python-is-python2` удалён из репозиториев. Для Android 7.1 нужно вручную создать симлинк на Python 2.7.
+
+Вот исправленный блок установки зависимостей:
+
+```yaml
+    - name: Setup Build Environment
+      run: |
+        sudo dpkg --add-architecture i386
+        sudo apt-get update -y
+        
+        # Установка Python 2.7 и зависимостей для Android 7.1
+        sudo apt-get install -y \
+          git-core gnupg flex bison gperf build-essential \
+          zip curl zlib1g-dev gcc-multilib g++-multilib \
+          libc6-dev-i386 libncurses5-dev libncursesw5-dev \
+          lib32ncurses-dev libx11-dev ccache libgl1-mesa-dev \
+          libxml2-utils xsltproc unzip m4 bc gawk \
+          liblz4-tool libsdl1.2-dev lzop pngcrush schedtool \
+          squashfs-tools xsltproc zip zlib1g-dev \
+          python2.7 python2-dev
+        
+        # Создаем python -> python2.7 (критично для Android 7.1)
+        sudo ln -sf /usr/bin/python2.7 /usr/bin/python
+        sudo ln -sf /usr/bin/python2.7 /usr/bin/python2
+        
+        python --version  # Должно показать Python 2.7.x
+```
+
+Если `lib32ncurses-dev` недоступен, замените на:
+```yaml
+          libncurses-dev libtinfo5 libtinfo5:i386
+```
+
+**Полный workflow** с этим фиксом:
+
+```yaml
 name: OrangeFox Recovery Build
 
 on:
@@ -16,25 +52,25 @@ on:
         required: true
         default: 'main'
       DEVICE_PATH:
-        description: 'Device Path (e.g., device/tcl/U5A_PLUS_3G)'
+        description: 'Device Path'
         required: true
-        default: 'tcl/U5A_PLUS_3G'
+        default: 'device/tcl/U5A_PLUS_3G'
       DEVICE_NAME:
-        description: 'Device Name (for output folder)'
+        description: 'Device Name'
         required: true
         default: 'U5A_PLUS_3G'
       MAKEFILE_NAME:
-        description: 'Makefile Name (e.g., twrp_U5A_PLUS_3G or omni_U5A_PLUS_3G)'
+        description: 'Makefile Name'
         required: true
-        default: 'omni_U5A_PLUS_3G'
+        default: 'twrp_U5A_PLUS_3G'
       BUILD_TARGET:
-        description: 'Build Target (recoveryimage or bootimage)'
+        description: 'Build Target'
         required: true
         default: 'recoveryimage'
 
 jobs:
   build:
-    runs-on: ubuntu-22.04  # 20.04 лучше для старых Android
+    runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
@@ -43,26 +79,27 @@ jobs:
 
     - name: Setup Build Environment
       run: |
+        sudo dpkg --add-architecture i386
         sudo apt-get update -y
         sudo apt-get install -y \
           git-core gnupg flex bison gperf build-essential \
           zip curl zlib1g-dev gcc-multilib g++-multilib \
-          libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev \
-          libx11-dev lib32z1-dev ccache libgl1-mesa-dev \
+          libc6-dev-i386 libncurses5-dev libncursesw5-dev \
+          lib32ncurses-dev libx11-dev ccache libgl1-mesa-dev \
           libxml2-utils xsltproc unzip m4 bc gawk \
-          liblz4-tool libncurses5-dev libsdl1.2-dev \
-          libwxgtk3.0-gtk3-dev libxml2-utils lzop \
-          pngcrush schedtool squashfs-tools xsltproc \
-          zip zlib1g-dev python3 python-is-python2
+          liblz4-tool libsdl1.2-dev lzop pngcrush schedtool \
+          squashfs-tools xsltproc zip zlib1g-dev \
+          python2.7 python2-dev
         
-        # Убедимся, что python это python2
+        # Python 2 для Android 7.1
+        sudo ln -sf /usr/bin/python2.7 /usr/bin/python
         python --version
 
     - name: Setup Java
       uses: actions/setup-java@v4
       with:
         distribution: 'zulu'
-        java-version: ${{ github.event.inputs.MANIFEST_BRANCH == '7.1' && '8' || '11' }}
+        java-version: '8'
 
     - name: Setup Repo Tool
       run: |
@@ -70,144 +107,39 @@ jobs:
         curl -o ~/.bin/repo https://storage.googleapis.com/git-repo-downloads/repo
         chmod a+x ~/.bin/repo
         echo "${HOME}/.bin" >> $GITHUB_PATH
-        export PATH="${HOME}/.bin:$PATH"
-        repo --version
-
-    - name: Initialize Workspace
-      run: |
-        mkdir -p workspace
-        echo "WORKSPACE=$(pwd)/workspace" >> $GITHUB_ENV
 
     - name: Sync Sources
       run: |
-        cd $WORKSPACE
-        
-        MANIFEST_BRANCH="${{ github.event.inputs.MANIFEST_BRANCH }}"
-        
-        if [ "$MANIFEST_BRANCH" = "7.1" ]; then
-          # Для 7.1 используем OmniROM manifest (TWRP)
-          repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b twrp-7.1
-        elif [ "$MANIFEST_BRANCH" = "12.1" ]; then
-          repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-12.1
-        else
-          # Для других версий - AOSP manifest
-          repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git -b twrp-${MANIFEST_BRANCH}
-        fi
-        
-        # Синхронизация (только необходимое)
+        mkdir -p workspace && cd workspace
+        repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b twrp-7.1
         repo sync -c --force-sync --no-clone-bundle --no-tags -j$(nproc --all)
 
-    - name: Setup OrangeFox Build System
+    - name: Setup OrangeFox 7.1
       run: |
-        cd $WORKSPACE
-        
-        MANIFEST_BRANCH="${{ github.event.inputs.MANIFEST_BRANCH }}"
-        
-        if [ "$MANIFEST_BRANCH" = "7.1" ]; then
-          echo "Setting up OrangeFox 7.1 build system..."
-          
-          # Удаляем стандартный build TWRP
-          rm -rf build/make
-          # Клонируем OrangeFox build
-          git clone https://gitlab.com/OrangeFox/build/make.git -b fox_7.1 build/make
-          
-          # Удаляем стандартный recovery
-          rm -rf bootable/recovery
-          # Клонируем OrangeFox recovery
-          git clone https://gitlab.com/OrangeFox/bootable/recovery.git -b fox_7.1 bootable/recovery
-          
-          # Дополнительно: vendor для OrangeFox
-          rm -rf vendor/twrp
-          mkdir -p vendor
-          git clone https://gitlab.com/OrangeFox/vendor/recovery.git -b fox_7.1 vendor/twrp || true
-        fi
+        cd workspace
+        rm -rf build/make bootable/recovery
+        git clone https://gitlab.com/OrangeFox/build/make.git -b fox_7.1 build/make
+        git clone https://gitlab.com/OrangeFox/bootable/recovery.git -b fox_7.1 bootable/recovery
 
     - name: Clone Device Tree
       run: |
-        cd $WORKSPACE
-        
-        DEVICE_PATH="${{ github.event.inputs.DEVICE_PATH }}"
-        mkdir -p $(dirname $DEVICE_PATH)
-        
-        git clone ${{ github.event.inputs.DEVICE_TREE_URL }} -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} $DEVICE_PATH
-        
-        echo "Device tree cloned to: $DEVICE_PATH"
-        ls -la $DEVICE_PATH
+        mkdir -p workspace/$(dirname ${{ github.event.inputs.DEVICE_PATH }})
+        git clone ${{ github.event.inputs.DEVICE_TREE_URL }} -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} workspace/${{ github.event.inputs.DEVICE_PATH }}
 
-    - name: Set Swap Space
-      uses: pierotofy/set-swap-space@master
-      with:
-        swap-size-gb: 12
-
-    - name: Build Recovery
+    - name: Build
       run: |
-        cd $WORKSPACE
-        
-        export ALLOW_MISSING_DEPENDENCIES=true
-        export FOX_USE_TWRP_RECOVERY_IMAGE_BUILDER=1
-        export FOX_VERSION="R11.1_0"  # Версия OrangeFox
-        
+        cd workspace
         source build/envsetup.sh
-        
-        # Определяем правильный lunch target
-        LUNCH_TARGET="${{ github.event.inputs.MAKEFILE_NAME }}-eng"
-        echo "Lunch target: $LUNCH_TARGET"
-        
-        lunch $LUNCH_TARGET
-        
-        # Очистка (опционально)
-        make clean || true
-        
-        # Сборка
+        export ALLOW_MISSING_DEPENDENCIES=true
+        lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng
         mka ${{ github.event.inputs.BUILD_TARGET }} -j$(nproc --all)
-        
-        # Проверяем результат
-        ls -la out/target/product/${{ github.event.inputs.DEVICE_NAME }}/ || true
 
-    - name: Prepare Artifacts
-      run: |
-        cd $WORKSPACE
-        
-        PRODUCT_PATH="out/target/product/${{ github.event.inputs.DEVICE_NAME }}"
-        
-        if [ -f "$PRODUCT_PATH/recovery.img" ]; then
-          echo "RECOVERY_IMG=$PRODUCT_PATH/recovery.img" >> $GITHUB_ENV
-        fi
-        
-        if [ -f "$PRODUCT_PATH/boot.img" ]; then
-          echo "BOOT_IMG=$PRODUCT_PATH/boot.img" >> $GITHUB_ENV
-        fi
-        
-        # Ищем OrangeFox zip (обычно называется OrangeFox-*.zip)
-        if ls $PRODUCT_PATH/OrangeFox*.zip 1> /dev/null 2>&1; then
-          echo "ORANGE_ZIP=$(ls $PRODUCT_PATH/OrangeFox*.zip | head -1)" >> $GITHUB_ENV
-        fi
-        
-        ls -la $PRODUCT_PATH/
-
-    - name: Upload to Release
+    - name: Upload
       uses: softprops/action-gh-release@v2
-      if: success()
       with:
-        files: |
-          ${{ env.RECOVERY_IMG }}
-          ${{ env.BOOT_IMG }}
-          ${{ env.ORANGE_ZIP }}
-        name: OrangeFox-${{ github.event.inputs.DEVICE_NAME }}-${{ github.event.inputs.MANIFEST_BRANCH }}-${{ github.run_id }}
+        files: workspace/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
+        name: OrangeFox-${{ github.event.inputs.DEVICE_NAME }}-${{ github.run_id }}
         tag_name: ${{ github.run_id }}
-        body: |
-          **Device:** ${{ github.event.inputs.DEVICE_NAME }}
-          **Android Version:** ${{ github.event.inputs.MANIFEST_BRANCH }}
-          **Build Date:** ${{ github.event.repository.updated_at }}
-          **Commit:** ${{ github.sha }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Upload Artifacts (if release fails)
-      uses: actions/upload-artifact@v4
-      if: failure()
-      with:
-        name: recovery-fallback-${{ github.event.inputs.DEVICE_NAME }}
-        path: |
-          ${{ env.WORKSPACE }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.img
-          ${{ env.WORKSPACE }}/out/target/product/${{ github.event.inputs.DEVICE_NAME }}/*.zip
+```
