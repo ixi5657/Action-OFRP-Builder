@@ -60,9 +60,9 @@ jobs:
 
     - name: Initialize workspace
       run: |
-        mkdir workspace
-        cd workspace
-        echo "workspace-folder=$(pwd)" >> $GITHUB_OUTPUT
+        run: |
+        mkdir -p workspace
+        echo "workspace-folder=${{ github.workspace }}/workspace" >> $GITHUB_OUTPUT
       id: pwd
 
     - name: Prepare the build environment
@@ -93,10 +93,9 @@ jobs:
           ssh-private-key: |
             ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Sync OrangeFox sources and minimal manifest
+    - name: Sync OrangeFox sources
       run: |
-        cd ${{ steps.pwd.outputs.workspace-folder }}
-        git clone ${{ github.event.inputs.SYNC_URL }}
+        git clone ${{ github.event.inputs.SYNC_URL }} sync
         cd sync
         ./orangefox_sync.sh --branch ${{ github.event.inputs.MANIFEST_BRANCH }} --path ${{ steps.pwd.outputs.workspace-folder }}/fox_${{ github.event.inputs.MANIFEST_BRANCH }}
       working-directory: ${{ steps.pwd.outputs.workspace-folder }}
