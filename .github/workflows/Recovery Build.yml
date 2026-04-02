@@ -1,39 +1,3 @@
-В Ubuntu 22.04 пакет `python-is-python2` удалён из репозиториев. Для Android 7.1 нужно вручную создать симлинк на Python 2.7.
-
-Вот исправленный блок установки зависимостей:
-
-```yaml
-    - name: Setup Build Environment
-      run: |
-        sudo dpkg --add-architecture i386
-        sudo apt-get update -y
-        
-        # Установка Python 2.7 и зависимостей для Android 7.1
-        sudo apt-get install -y \
-          git-core gnupg flex bison gperf build-essential \
-          zip curl zlib1g-dev gcc-multilib g++-multilib \
-          libc6-dev-i386 libncurses5-dev libncursesw5-dev \
-          lib32ncurses-dev libx11-dev ccache libgl1-mesa-dev \
-          libxml2-utils xsltproc unzip m4 bc gawk \
-          liblz4-tool libsdl1.2-dev lzop pngcrush schedtool \
-          squashfs-tools xsltproc zip zlib1g-dev \
-          python2.7 python2-dev
-        
-        # Создаем python -> python2.7 (критично для Android 7.1)
-        sudo ln -sf /usr/bin/python2.7 /usr/bin/python
-        sudo ln -sf /usr/bin/python2.7 /usr/bin/python2
-        
-        python --version  # Должно показать Python 2.7.x
-```
-
-Если `lib32ncurses-dev` недоступен, замените на:
-```yaml
-          libncurses-dev libtinfo5 libtinfo5:i386
-```
-
-**Полный workflow** с этим фиксом:
-
-```yaml
 name: OrangeFox Recovery Build
 
 on:
@@ -142,4 +106,3 @@ jobs:
         tag_name: ${{ github.run_id }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
